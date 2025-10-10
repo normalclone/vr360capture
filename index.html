@@ -1,862 +1,453 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <title>360° VR Capture</title>
-  
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-    }
-    
-    body {
-      width: 100%;
-      height: 100vh;
-      overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #000;
-      color: #fff;
-      position: fixed;
-      touch-action: none;
-    }
-    
-    #video {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      z-index: 1;
-    }
-    
-    #hudCanvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 2;
-      pointer-events: none;
-    }
-    
-    #controls {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(0, 0, 0, 0.85);
-      padding: 15px;
-      z-index: 3;
-      border-radius: 20px 20px 0 0;
-      backdrop-filter: blur(10px);
-    }
-    
-    #info {
-      font-size: 12px;
-      margin-bottom: 12px;
-      line-height: 1.6;
-      color: #aaa;
-    }
-    
-    #info .current {
-      color: #fff;
-      font-weight: bold;
-    }
-    
-    #info .target {
-      color: #00c8ff;
-    }
-    
-    .btn-group {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 8px;
-      flex-wrap: wrap;
-    }
-    
-    button {
-      flex: 1;
-      min-height: 48px;
-      border: none;
-      border-radius: 12px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      color: #fff;
-      background: #333;
-      min-width: 80px;
-    }
-    
-    button:active {
-      transform: scale(0.95);
-    }
-    
-    button:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-    
-    #startBtn {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-    
-    #captureBtn {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    }
-    
-    #captureBtn.ready {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      animation: pulse 1s infinite;
-    }
-    
-    @keyframes pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(79, 172, 254, 0.7); }
-      50% { box-shadow: 0 0 0 15px rgba(79, 172, 254, 0); }
-    }
-    
-    #stitchBtn {
-      background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-    }
-    
-    #viewBtn {
-      background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
-    }
-    
-    #downloadBtn {
-      background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-      color: #333;
-    }
-    
-    #resetBtn {
-      background: #444;
-      flex: 0 0 auto;
-      min-width: 60px;
-    }
-    
-    #status {
-      font-size: 11px;
-      color: #00ff00;
-      text-align: center;
-      margin-top: 8px;
-      min-height: 16px;
-    }
-    
-    #viewer {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 100;
-      display: none;
-      background: #000;
-    }
-    
-    #closeViewer {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      z-index: 101;
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      background: rgba(0, 0, 0, 0.7);
-      border: 2px solid #fff;
-      color: #fff;
-      font-size: 24px;
-      display: none;
-      justify-content: center;
-      align-items: center;
-      cursor: pointer;
-    }
-    
-    #progress {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.9);
-      padding: 30px 40px;
-      border-radius: 15px;
-      z-index: 50;
-      display: none;
-      text-align: center;
-    }
-    
-    #progress .spinner {
-      width: 50px;
-      height: 50px;
-      border: 4px solid #333;
-      border-top-color: #00c8ff;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 15px;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
-    .hidden {
-      display: none !important;
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Mobile 360 Capture — 16 ảnh (South-Locked + Framing Mask)</title>
+
+<!-- Viewer -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photo-sphere-viewer@5/dist/photo-sphere-viewer.min.css">
+<script src="https://cdn.jsdelivr.net/npm/uevent@2/browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/photo-sphere-viewer@5/dist/photo-sphere-viewer.min.js"></script>
+
+<!-- OpenCV.js (WASM) -->
+<script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+<style>
+  :root { --panel-bg: rgba(0,0,0,.55); --ok:#18ff4a; --warn:#ffba08; --arrow:#00c8ff; }
+  html,body{ margin:0; height:100%; background:#000; font-family:system-ui,Arial,sans-serif; }
+  video#cam{ position:fixed; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+  canvas#hud{ position:fixed; inset:0; width:100%; height:100%; pointer-events:none; }
+  #panel{
+    position:fixed; left:0; right:0; bottom:0; padding:10px 8px; color:#fff;
+    background:var(--panel-bg); backdrop-filter:blur(6px); font-size:14px; text-align:center;
+  }
+  #panel .row{ margin-top:6px; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px; }
+  #panel button{ padding:9px 14px; margin:2px; font-size:15px; border:0; border-radius:10px; }
+  #panel button:disabled{ opacity:.5 }
+  #viewer{ display:none; position:fixed; inset:0; z-index:10; background:#000; }
+  .hint{ position:fixed; top:8px; left:8px; right:8px; color:#fff; font-size:12px;
+         background:var(--panel-bg); padding:6px 8px; border-radius:10px; }
+  @media (orientation:landscape){
+    .hint::after{ content:"Vui lòng xoay dọc (portrait) để chụp chính xác."; display:block; margin-top:4px; color:#ffef8a; }
+  }
+  label.inline{ display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.12); padding:6px 8px; border-radius:10px; }
+  input[type=range]{ width:120px; }
+</style>
 </head>
 <body>
-  <video id="video" playsinline autoplay muted></video>
-  <canvas id="hudCanvas"></canvas>
-  
-  <div id="controls">
-    <div id="info">
-      <div><span class="current">Hiện tại:</span> Yaw: <span id="curYaw">--</span>° | Pitch: <span id="curPitch">--</span>° | Roll: <span id="curRoll">--</span>°</div>
-      <div><span class="target">Mục tiêu:</span> Yaw: <span id="tgtYaw">--</span>° | Pitch: <span id="tgtPitch">--</span>° | Ảnh: <span id="imgCount">0/16</span></div>
-    </div>
-    
-    <div class="btn-group">
-      <button id="startBtn">🚀 Bắt đầu</button>
-      <button id="captureBtn" disabled>📸 Chụp</button>
-      <button id="resetBtn" disabled>🔄</button>
-    </div>
-    
-    <div class="btn-group">
-      <button id="stitchBtn" disabled>🧩 Ghép ảnh</button>
-      <button id="viewBtn" disabled>🌐 Xem 360</button>
-      <button id="downloadBtn" disabled>💾 Tải về</button>
-    </div>
-    
-    <div id="status"></div>
+
+<div class="hint">
+  Bấm <b>Bắt đầu</b> → (tùy chọn) <b>Căn ngang</b> để đặt 0° → căn HUD (thanh ngang thẳng, la bàn & pitch xanh),
+  đưa <b>hồng tâm</b> vào <b>khung đích</b> → <b>Chụp</b> 16 ảnh theo mũi tên → <b>Ghép ảnh</b> → Xem 360 → Tải ảnh.
+</div>
+
+<video id="cam" playsinline autoplay></video>
+<canvas id="hud"></canvas>
+
+<div id="panel">
+  <div>Yaw: <b id="yawVal">0</b>° | Pitch: <b id="pitchVal">0</b>° | Roll: <b id="rollVal">0</b>°</div>
+  <div>Target: yaw <b id="yawT">0</b>° | pitch <b id="pitchT">0</b>° &nbsp; (South-locked)</div>
+  <div class="row">
+    <button id="startBtn">Bắt đầu</button>
+    <button id="calibPitchBtn">Căn ngang (đặt 0°)</button>
+    <label class="inline">vFOV:
+      <input id="vfov" type="range" min="40" max="80" value="60" step="1" />
+      <span id="vfovVal">60°</span>
+    </label>
+    <button id="shotBtn" disabled>Chụp</button>
+    <button id="stitchBtn" disabled>Ghép ảnh</button>
+    <button id="viewBtn" disabled>Xem 360</button>
+    <button id="downloadBtn" disabled>Tải ảnh</button>
+    <button id="resetBtn">Reset</button>
   </div>
-  
-  <div id="progress">
-    <div class="spinner"></div>
-    <div id="progressText">Đang xử lý...</div>
-  </div>
-  
-  <div id="viewer"></div>
-  <button id="closeViewer">✕</button>
-  
-  <canvas id="captureCanvas" style="display:none"></canvas>
-  
-  <!-- OpenCV.js -->
-  <script async src="https://docs.opencv.org/4.8.0/opencv.js"></script>
-  
-  <!-- Photo Sphere Viewer -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/index.css"/>
-  <script src="https://cdn.jsdelivr.net/npm/three/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/index.js"></script>
-  
-  <script>
-    // ============ CONSTANTS ============
-    const YAW_TOL = 5;
-    const PITCH_TOL = 5;
-    const ROLL_TOL = 3;
-    
-    const TARGETS = [
-      // Equator (8)
-      {yaw:0,pitch:0},{yaw:45,pitch:0},{yaw:90,pitch:0},{yaw:135,pitch:0},
-      {yaw:180,pitch:0},{yaw:225,pitch:0},{yaw:270,pitch:0},{yaw:315,pitch:0},
-      // Top (4)
-      {yaw:0,pitch:-30},{yaw:90,pitch:-30},{yaw:180,pitch:-30},{yaw:270,pitch:-30},
-      // Bottom (4)
-      {yaw:0,pitch:30},{yaw:90,pitch:30},{yaw:180,pitch:30},{yaw:270,pitch:30}
-    ];
-    
-    // ============ STATE ============
-    let video, hudCanvas, hudCtx;
-    let captureCanvas, captureCtx;
-    let stream = null;
-    let compassOffset = 0;
-    let currentOrientation = {yaw: 0, pitch: 0, roll: 0};
-    let capturedImages = [];
-    let currentTargetIndex = 0;
-    let panoramaDataUrl = null;
-    let viewer = null;
-    let isCalibrated = false;
-    
-    // ============ INITIALIZATION ============
-    window.addEventListener('load', () => {
-      video = document.getElementById('video');
-      hudCanvas = document.getElementById('hudCanvas');
-      hudCtx = hudCanvas.getContext('2d');
-      captureCanvas = document.getElementById('captureCanvas');
-      captureCtx = captureCanvas.getContext('2d');
-      
-      resizeCanvas();
-      window.addEventListener('resize', resizeCanvas);
-      
-      document.getElementById('startBtn').addEventListener('click', startCapture);
-      document.getElementById('captureBtn').addEventListener('click', captureImage);
-      document.getElementById('resetBtn').addEventListener('click', reset);
-      document.getElementById('stitchBtn').addEventListener('click', stitchPanorama);
-      document.getElementById('viewBtn').addEventListener('click', viewPanorama);
-      document.getElementById('downloadBtn').addEventListener('click', downloadPanorama);
-      document.getElementById('closeViewer').addEventListener('click', closeViewer);
-      
-      setStatus('Sẵn sàng. Nhấn "Bắt đầu" để khởi động.');
-    });
-    
-    function resizeCanvas() {
-      hudCanvas.width = window.innerWidth;
-      hudCanvas.height = window.innerHeight;
-    }
-    
-    // ============ CAMERA & ORIENTATION ============
-    async function startCapture() {
-      try {
-        // Request sensor permission on iOS
-        if (typeof DeviceOrientationEvent !== 'undefined' && 
-            typeof DeviceOrientationEvent.requestPermission === 'function') {
-          const permission = await DeviceOrientationEvent.requestPermission();
-          if (permission !== 'granted') {
-            alert('Cần quyền truy cập cảm biến để hoạt động!');
-            return;
-          }
-        }
-        
-        // Start camera
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'environment',
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          }
-        });
-        
-        video.srcObject = stream;
-        await video.play();
-        
-        // Setup capture canvas
-        captureCanvas.width = video.videoWidth;
-        captureCanvas.height = video.videoHeight;
-        
-        // Start orientation tracking
-        window.addEventListener('deviceorientation', handleOrientation, true);
-        
-        // Calibrate compass to South
-        setStatus('Đang hiệu chuẩn la bàn...');
-        setTimeout(() => {
-          calibrateCompass();
-          isCalibrated = true;
-          setStatus('✅ Sẵn sàng chụp ảnh!');
-          document.getElementById('startBtn').disabled = true;
-          document.getElementById('resetBtn').disabled = false;
-          requestAnimationFrame(drawHUD);
-        }, 1000);
-        
-      } catch (err) {
-        console.error('Camera error:', err);
-        alert('Không thể truy cập camera: ' + err.message);
-      }
-    }
-    
-    function handleOrientation(event) {
-      if (!isCalibrated) return;
-      
-      let alpha = event.alpha || 0; // compass heading
-      let beta = event.beta || 0;   // pitch
-      let gamma = event.gamma || 0; // roll
-      
-      // Normalize for portrait mode
-      let yaw = (alpha + compassOffset + 360) % 360;
-      let pitch = beta;
-      let roll = gamma;
-      
-      // Adjust for portrait orientation
-      if (Math.abs(roll) > 45) {
-        pitch = gamma;
-        roll = -beta;
-      }
-      
-      currentOrientation = { yaw, pitch, roll };
-      
-      // Update UI
-      document.getElementById('curYaw').textContent = Math.round(yaw);
-      document.getElementById('curPitch').textContent = Math.round(pitch);
-      document.getElementById('curRoll').textContent = Math.round(roll);
-      
-      // Check if ready to capture
-      updateCaptureButton();
-    }
-    
-    function calibrateCompass() {
-      // Read current heading and set offset so South (180°) becomes 0° logical
-      const currentHeading = currentOrientation.yaw || 0;
-      compassOffset = (180 - currentHeading + 360) % 360;
-      console.log('Compass calibrated. Offset:', compassOffset);
-    }
-    
-    function updateCaptureButton() {
-      if (capturedImages.length >= TARGETS.length) return;
-      
-      const target = TARGETS[currentTargetIndex];
-      const yawDiff = Math.abs(diffAngle(currentOrientation.yaw, target.yaw));
-      const pitchDiff = Math.abs(currentOrientation.pitch - target.pitch);
-      const rollOk = Math.abs(currentOrientation.roll) <= ROLL_TOL;
-      
-      const ready = yawDiff <= YAW_TOL && pitchDiff <= PITCH_TOL && rollOk;
-      
-      const captureBtn = document.getElementById('captureBtn');
-      captureBtn.disabled = !ready;
-      if (ready) {
-        captureBtn.classList.add('ready');
-      } else {
-        captureBtn.classList.remove('ready');
-      }
-      
-      // Update target display
-      document.getElementById('tgtYaw').textContent = target.yaw;
-      document.getElementById('tgtPitch').textContent = target.pitch;
-    }
-    
-    // ============ CAPTURE ============
-    function captureImage() {
-      if (!stream) return;
-      
-      // Draw video frame to canvas
-      captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
-      const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.92);
-      
-      // Store image with metadata
-      capturedImages.push({
-        yaw: currentOrientation.yaw,
-        pitch: currentOrientation.pitch,
-        roll: currentOrientation.roll,
-        dataUrl: dataUrl,
-        targetIndex: currentTargetIndex
-      });
-      
-      // Update UI
-      document.getElementById('imgCount').textContent = `${capturedImages.length}/16`;
-      setStatus(`✅ Đã chụp ảnh ${capturedImages.length}/16`);
-      
-      // Move to next target
-      currentTargetIndex++;
-      if (currentTargetIndex >= TARGETS.length) {
-        setStatus('✅ Đã chụp đủ 16 ảnh! Nhấn "Ghép ảnh" để xử lý.');
-        document.getElementById('captureBtn').disabled = true;
-        document.getElementById('stitchBtn').disabled = false;
-      }
-    }
-    
-    // ============ HUD DRAWING ============
-    function drawHUD() {
-      if (!isCalibrated) return;
-      
-      const w = hudCanvas.width;
-      const h = hudCanvas.height;
-      const cx = w / 2;
-      const cy = h / 2;
-      
-      hudCtx.clearRect(0, 0, w, h);
-      
-      // Target
-      const target = TARGETS[currentTargetIndex];
-      if (!target) return;
-      
-      const yawDiff = diffAngle(currentOrientation.yaw, target.yaw);
-      const pitchDiff = currentOrientation.pitch - target.pitch;
-      const rollOk = Math.abs(currentOrientation.roll) <= ROLL_TOL;
-      const yawOk = Math.abs(yawDiff) <= YAW_TOL;
-      const pitchOk = Math.abs(pitchDiff) <= PITCH_TOL;
-      
-      // Draw frame
-      const frameW = w * 0.84;
-      const frameH = h * 0.92;
-      const frameX = cx - frameW/2;
-      const frameY = cy - frameH/2;
-      
-      hudCtx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-      hudCtx.lineWidth = 2;
-      hudCtx.strokeRect(frameX, frameY, frameW, frameH);
-      
-      // Draw center circle
-      const radius = Math.min(w, h) * 0.18;
-      hudCtx.strokeStyle = yawOk && pitchOk ? '#00ff00' : 'rgba(255, 255, 255, 0.8)';
-      hudCtx.lineWidth = 3;
-      hudCtx.beginPath();
-      hudCtx.arc(cx, cy, radius, 0, Math.PI * 2);
-      hudCtx.stroke();
-      
-      // Draw center cross
-      hudCtx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-      hudCtx.lineWidth = 2;
-      hudCtx.beginPath();
-      hudCtx.moveTo(cx - 20, cy);
-      hudCtx.lineTo(cx + 20, cy);
-      hudCtx.moveTo(cx, cy - 20);
-      hudCtx.lineTo(cx, cy + 20);
-      hudCtx.stroke();
-      
-      // Draw roll indicator
-      const rollBarY = cy + radius + 40;
-      const rollBarW = 150;
-      const rollX = cx + (currentOrientation.roll / 45) * (rollBarW / 2);
-      
-      hudCtx.fillStyle = rollOk ? '#00ff00' : '#ff4444';
-      hudCtx.fillRect(rollX - 2, rollBarY - 10, 4, 20);
-      
-      hudCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-      hudCtx.lineWidth = 1;
-      hudCtx.strokeRect(cx - rollBarW/2, rollBarY - 10, rollBarW, 20);
-      
-      // Draw yaw compass
-      const compassY = cy - radius - 60;
-      const compassW = 200;
-      drawCompass(cx, compassY, compassW, currentOrientation.yaw, target.yaw, yawOk);
-      
-      // Draw pitch indicator
-      const pitchX = w - 60;
-      const pitchH = 200;
-      drawPitchScale(pitchX, cy, pitchH, currentOrientation.pitch, target.pitch, pitchOk);
-      
-      // Draw arrow to next target
-      if (capturedImages.length < TARGETS.length && !yawOk) {
-        drawArrowToTarget(cx, cy, radius + 50, yawDiff);
-      }
-      
-      requestAnimationFrame(drawHUD);
-    }
-    
-    function drawCompass(cx, cy, width, currentYaw, targetYaw, isCorrect) {
-      const ctx = hudCtx;
-      const halfW = width / 2;
-      
-      // Background
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-      ctx.fillRect(cx - halfW, cy - 15, width, 30);
-      
-      // Tick marks
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.lineWidth = 1;
-      for (let i = -180; i <= 180; i += 15) {
-        const angle = currentYaw + i;
-        if (angle < 0 || angle >= 360) continue;
-        const x = cx + (i / 90) * halfW;
-        const tickH = i % 45 === 0 ? 10 : 5;
-        ctx.beginPath();
-        ctx.moveTo(x, cy - tickH);
-        ctx.lineTo(x, cy + tickH);
-        ctx.stroke();
-      }
-      
-      // Target marker
-      const targetDiff = diffAngle(targetYaw, currentYaw);
-      const targetX = cx + (targetDiff / 90) * halfW;
-      if (Math.abs(targetDiff) <= 90) {
-        ctx.fillStyle = isCorrect ? '#00ff00' : '#00c8ff';
-        ctx.beginPath();
-        ctx.moveTo(targetX, cy - 15);
-        ctx.lineTo(targetX - 6, cy - 25);
-        ctx.lineTo(targetX + 6, cy - 25);
-        ctx.fill();
-      }
-      
-      // Center line
-      ctx.strokeStyle = isCorrect ? '#00ff00' : '#ffffff';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - 20);
-      ctx.lineTo(cx, cy + 20);
-      ctx.stroke();
-    }
-    
-    function drawPitchScale(x, cy, height, currentPitch, targetPitch, isCorrect) {
-      const ctx = hudCtx;
-      const halfH = height / 2;
-      
-      // Background
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-      ctx.fillRect(x - 15, cy - halfH, 30, height);
-      
-      // Tick marks
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.lineWidth = 1;
-      for (let p = -60; p <= 60; p += 10) {
-        const y = cy + (p / 60) * halfH;
-        const tickW = p % 30 === 0 ? 10 : 5;
-        ctx.beginPath();
-        ctx.moveTo(x - tickW, y);
-        ctx.lineTo(x + tickW, y);
-        ctx.stroke();
-      }
-      
-      // Target marker
-      const targetY = cy + (targetPitch / 60) * halfH;
-      if (Math.abs(targetPitch) <= 60) {
-        ctx.fillStyle = isCorrect ? '#00ff00' : '#00c8ff';
-        ctx.beginPath();
-        ctx.moveTo(x - 15, targetY);
-        ctx.lineTo(x - 25, targetY - 6);
-        ctx.lineTo(x - 25, targetY + 6);
-        ctx.fill();
-      }
-      
-      // Current line
-      const currentY = cy + (currentPitch / 60) * halfH;
-      ctx.strokeStyle = isCorrect ? '#00ff00' : '#ffffff';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(x - 20, currentY);
-      ctx.lineTo(x + 20, currentY);
-      ctx.stroke();
-    }
-    
-    function drawArrowToTarget(cx, cy, radius, yawDiff) {
-      const ctx = hudCtx;
-      const angle = (yawDiff * Math.PI) / 180;
-      const arrowX = cx + Math.sin(angle) * radius;
-      const arrowY = cy - Math.cos(angle) * radius;
-      
-      ctx.save();
-      ctx.translate(arrowX, arrowY);
-      ctx.rotate(angle);
-      
-      // Arrow
-      ctx.fillStyle = '#00c8ff';
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, -20);
-      ctx.lineTo(-10, 0);
-      ctx.lineTo(0, -5);
-      ctx.lineTo(10, 0);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      
-      ctx.restore();
-    }
-    
-    // ============ STITCHING ============
-    async function stitchPanorama() {
-      if (capturedImages.length < 8) {
-        alert('Cần ít nhất 8 ảnh để ghép panorama!');
-        return;
-      }
-      
-      showProgress('Đang tải OpenCV.js...');
-      
-      // Wait for OpenCV
-      if (typeof cv === 'undefined') {
-        await waitForOpenCV();
-      }
-      
-      try {
-        showProgress('Đang xử lý ảnh...');
-        
-        // Load images
-        const images = [];
-        for (let i = 0; i < capturedImages.length; i++) {
-          const img = await loadImage(capturedImages[i].dataUrl);
-          images.push(img);
-        }
-        
-        showProgress('Đang ghép ảnh (có thể mất vài phút)...');
-        
-        // Stitch images
-        const result = await stitchImages(images);
-        
-        if (result) {
-          panoramaDataUrl = result;
-          document.getElementById('viewBtn').disabled = false;
-          document.getElementById('downloadBtn').disabled = false;
-          setStatus('✅ Đã ghép xong! Nhấn "Xem 360" để xem kết quả.');
-        } else {
-          setStatus('❌ Ghép ảnh thất bại. Thử chụp lại với góc chính xác hơn.');
-        }
-        
-      } catch (err) {
-        console.error('Stitch error:', err);
-        alert('Lỗi khi ghép ảnh: ' + err.message);
-      } finally {
-        hideProgress();
-      }
-    }
-    
-    function waitForOpenCV() {
-      return new Promise((resolve, reject) => {
-        if (typeof cv !== 'undefined' && cv.Mat) {
-          resolve();
-          return;
-        }
-        
-        let attempts = 0;
-        const check = setInterval(() => {
-          attempts++;
-          if (typeof cv !== 'undefined' && cv.Mat) {
-            clearInterval(check);
-            resolve();
-          } else if (attempts > 100) {
-            clearInterval(check);
-            reject(new Error('OpenCV.js không tải được'));
-          }
-        }, 100);
-      });
-    }
-    
-    function loadImage(dataUrl) {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = dataUrl;
-      });
-    }
-    
-    async function stitchImages(images) {
-      try {
-        // Downscale images
-        const MAX_LONG = 1800;
-        const mats = [];
-        
-        for (let img of images) {
-          const scale = Math.min(1, MAX_LONG / Math.max(img.width, img.height));
-          const w = Math.floor(img.width * scale);
-          const h = Math.floor(img.height * scale);
-          
-          const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-          
-          const imgData = ctx.getImageData(0, 0, w, h);
-          const mat = cv.matFromImageData(imgData);
-          mats.push(mat);
-        }
-        
-        // Use simple horizontal stitching for equator images
-        const equatorMats = mats.slice(0, 8);
-        let result = equatorMats[0].clone();
-        
-        for (let i = 1; i < equatorMats.length; i++) {
-          const combined = new cv.Mat();
-          cv.hconcat(new cv.MatVector([result, equatorMats[i]]), combined);
-          result.delete();
-          result = combined;
-        }
-        
-        // Convert to data URL
-        const canvas = document.createElement('canvas');
-        cv.imshow(canvas, result);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        
-        // Cleanup
-        mats.forEach(m => m.delete());
-        result.delete();
-        
-        return dataUrl;
-        
-      } catch (err) {
-        console.error('Stitch error:', err);
-        return null;
-      }
-    }
-    
-    // ============ VIEWER ============
-    function viewPanorama() {
-      if (!panoramaDataUrl) return;
-      
-      const viewerDiv = document.getElementById('viewer');
-      viewerDiv.style.display = 'block';
-      document.getElementById('closeViewer').style.display = 'flex';
-      
-      if (viewer) {
-        viewer.destroy();
-      }
-      
-      viewer = new PhotoSphereViewer.Viewer({
-        container: viewerDiv,
-        panorama: panoramaDataUrl,
-        defaultYaw: 0,
-        defaultPitch: 0,
-        navbar: ['zoom', 'move', 'fullscreen'],
-        touchmoveTwoFingers: true,
-        mousewheelCtrlKey: false,
-        defaultZoomLvl: 50
-      });
-    }
-    
-    function closeViewer() {
-      document.getElementById('viewer').style.display = 'none';
-      document.getElementById('closeViewer').style.display = 'none';
-      if (viewer) {
-        viewer.destroy();
-        viewer = null;
-      }
-    }
-    
-    // ============ DOWNLOAD ============
-    function downloadPanorama() {
-      if (!panoramaDataUrl) return;
-      
-      const link = document.createElement('a');
-      link.download = `panorama_${Date.now()}.jpg`;
-      link.href = panoramaDataUrl;
-      link.click();
-      
-      setStatus('✅ Đã tải ảnh về máy!');
-    }
-    
-    // ============ RESET ============
-    function reset() {
-      capturedImages = [];
-      currentTargetIndex = 0;
-      panoramaDataUrl = null;
-      isCalibrated = false;
-      
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        stream = null;
-      }
-      
-      video.srcObject = null;
-      hudCtx.clearRect(0, 0, hudCanvas.width, hudCanvas.height);
-      
-      document.getElementById('imgCount').textContent = '0/16';
-      document.getElementById('startBtn').disabled = false;
-      document.getElementById('captureBtn').disabled = true;
-      document.getElementById('captureBtn').classList.remove('ready');
-      document.getElementById('resetBtn').disabled = true;
-      document.getElementById('stitchBtn').disabled = true;
-      document.getElementById('viewBtn').disabled = true;
-      document.getElementById('downloadBtn').disabled = true;
-      
-      setStatus('Đã reset. Nhấn "Bắt đầu" để chụp lại.');
-      
-      if (viewer) {
-        viewer.destroy();
-        viewer = null;
-      }
-      closeViewer();
-    }
-    
-    // ============ UTILITIES ============
-    function diffAngle(a, b) {
-      let diff = (a - b + 540) % 360 - 180;
-      return diff;
-    }
-    
-    function setStatus(text) {
-      document.getElementById('status').textContent = text;
-    }
-    
-    function showProgress(text) {
-      document.getElementById('progress').style.display = 'block';
-      document.getElementById('progressText').textContent = text;
-    }
-    
-    function hideProgress() {
-      document.getElementById('progress').style.display = 'none';
-    }
-  </script>
+</div>
+
+<div id="viewer"></div>
+
+<script>
+/* ====================== CONFIG / TARGETS (16 shots) ====================== */
+const targets = [
+  // Equator (8)
+  {yaw:0,pitch:0},{yaw:45,pitch:0},{yaw:90,pitch:0},{yaw:135,pitch:0},
+  {yaw:180,pitch:0},{yaw:225,pitch:0},{yaw:270,pitch:0},{yaw:315,pitch:0},
+  // Top (4)
+  {yaw:0,pitch:-30},{yaw:90,pitch:-30},{yaw:180,pitch:-30},{yaw:270,pitch:-30},
+  // Bottom (4)
+  {yaw:0,pitch:30},{yaw:90,pitch:30},{yaw:180,pitch:30},{yaw:270,pitch:30},
+];
+const YAW_TOL=5, PITCH_TOL=5, ROLL_TOL=3;
+
+/* ====================== STATE ====================== */
+let idx=0, captured=[], compassOffset=0, compassCalibrated=false, panoUrl=null, viewer=null;
+let pitchZero = 0;                 // offset “đặt 0°” theo tư thế người dùng
+let lastPose = { yaw:0, pitch:0, roll:0 };
+let V_FOV_DEG = 60;                // góc nhìn dọc ước lượng, để quy đổi pitch→pixel mask
+
+/* ====================== DOM ====================== */
+const cam=document.getElementById('cam');
+const hud=document.getElementById('hud'); const ctx=hud.getContext('2d');
+const yawEl=document.getElementById('yawVal'), pitchEl=document.getElementById('pitchVal'), rollEl=document.getElementById('rollVal');
+const yawT=document.getElementById('yawT'), pitchT=document.getElementById('pitchT');
+const startBtn=document.getElementById('startBtn'), shotBtn=document.getElementById('shotBtn'), stitchBtn=document.getElementById('stitchBtn');
+const viewBtn=document.getElementById('viewBtn'), downloadBtn=document.getElementById('downloadBtn'), viewerDiv=document.getElementById('viewer');
+const calibPitchBtn=document.getElementById('calibPitchBtn');
+const vfov=document.getElementById('vfov'), vfovVal=document.getElementById('vfovVal');
+
+vfov.oninput=()=>{ V_FOV_DEG=+vfov.value; vfovVal.textContent=V_FOV_DEG+'°'; };
+calibPitchBtn.onclick=()=>{ pitchZero = lastPose.pitch; };
+
+/* ====================== INIT ====================== */
+startBtn.onclick = startApp;
+shotBtn.onclick = onCapture;
+stitchBtn.onclick = doStitch;
+viewBtn.onclick = () => { viewerDiv.style.display='block'; initViewer(); };
+downloadBtn.onclick = downloadPano;
+document.getElementById('resetBtn').onclick = resetAll;
+
+function resetAll(){
+  idx=0; captured=[]; panoUrl=null;
+  viewBtn.disabled=true; downloadBtn.disabled=true; stitchBtn.disabled=true;
+  shotBtn.disabled=true; yawT.textContent=targets[0].yaw; pitchT.textContent=targets[0].pitch;
+}
+
+async function startApp(){
+  await initCamera();
+  await initOrientation(); // DeviceOrientation + DeviceMotion
+  lockPortrait();
+  yawT.textContent=targets[0].yaw; pitchT.textContent=targets[0].pitch;
+}
+
+async function initCamera(){
+  const s = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' }, audio:false });
+  cam.srcObject=s; await cam.play();
+}
+
+async function initOrientation(){
+  // iOS cần xin quyền cho cả Orientation & Motion
+  if (window.DeviceOrientationEvent?.requestPermission) {
+    try{ await DeviceOrientationEvent.requestPermission(); }catch{}
+  }
+  if (window.DeviceMotionEvent?.requestPermission) {
+    try{ await DeviceMotionEvent.requestPermission(); }catch{}
+  }
+  // YAW từ alpha (để khóa hướng Nam)
+  window.addEventListener('deviceorientation',(e)=>{
+    if (e.alpha==null) return;
+    if (!compassCalibrated) calibrateToSouth(e.alpha);
+    const yaw = (e.alpha + compassOffset + 360) % 360; // 0° logic = Nam
+    lastPose.yaw = yaw;
+  },true);
+
+  // PITCH/ROLL từ vector gravity (ổn định theo mặt đất)
+  window.addEventListener('devicemotion',(e)=>{
+    if (!e.accelerationIncludingGravity) return;
+    const { pitchDeg, rollDeg } = poseFromGravity(e.accelerationIncludingGravity);
+    lastPose.pitch = pitchDeg - pitchZero;  // căn ngang làm 0°
+    lastPose.roll  = rollDeg;
+
+    updateHUD(lastPose.yaw, lastPose.pitch, lastPose.roll);
+  },true);
+}
+
+function calibrateToSouth(alphaMagNorth){
+  // đặt South (180° thật) -> 0° logic
+  const headingStart=alphaMagNorth;
+  compassOffset = (180 - headingStart + 360) % 360;
+  compassCalibrated=true;
+}
+
+function lockPortrait(){
+  if (screen.orientation?.lock) screen.orientation.lock('portrait').catch(()=>{});
+}
+
+/* ---- Tính pitch/roll từ gravity, quy về portrait ---- */
+function poseFromGravity(g){
+  // Trục portrait: x→ phải, y→ lên, z→ ra khỏi màn
+  let gx=g.x, gy=g.y, gz=g.z;
+
+  // Bù xoay màn hình để quy về portrait
+  const ang = (screen.orientation?.angle ?? window.orientation ?? 0);
+  const rad = ang * Math.PI/180;
+  const cos = Math.cos(-rad), sin = Math.sin(-rad);
+  const rx = gx*cos - gy*sin;
+  const ry = gx*sin + gy*cos;
+  const rz = gz;
+
+  // pitch = atan2(-rx, sqrt(ry^2 + rz^2)), roll = atan2(ry, rz)
+  const pitch = Math.atan2(-rx, Math.hypot(ry, rz));
+  const roll  = Math.atan2( ry, rz );
+
+  return { pitchDeg: pitch*180/Math.PI, rollDeg: roll*180/Math.PI };
+}
+
+/* ====================== HUD DRAW ====================== */
+function diffAngle(a,b){ let d=Math.abs(a-b)%360; return d>180?360-d:d; }
+
+function updateHUD(yaw,pitch,roll){
+  yawEl.textContent=yaw.toFixed(0); pitchEl.textContent=pitch.toFixed(0); rollEl.textContent=roll.toFixed(0);
+
+  const t=targets[idx]; yawT.textContent=t.yaw; pitchT.textContent=t.pitch;
+  const yawOk  = diffAngle(yaw,t.yaw)<=YAW_TOL;
+  const pitchOk= Math.abs(pitch-t.pitch)<=PITCH_TOL;
+  const rollOk = Math.abs(roll)<=ROLL_TOL;
+  shotBtn.disabled = !(yawOk&&pitchOk&&rollOk);
+
+  drawHUD(yaw,pitch,roll);
+}
+
+function drawHUD(yaw,pitch,roll){
+  const w=hud.width=innerWidth, h=hud.height=innerHeight;
+  ctx.clearRect(0,0,w,h);
+  const cx=w/2, cy=h/2, r=Math.min(w,h)*0.18;
+
+  // frame
+  ctx.lineWidth=6; ctx.strokeStyle='#000';
+  ctx.strokeRect(w*0.08,h*0.04,w*0.84,h*0.92);
+
+  // center circle
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+
+  // roll level
+  ctx.save();
+  ctx.translate(cx,cy); ctx.rotate(roll*Math.PI/180);
+  ctx.strokeStyle = Math.abs(roll)<=ROLL_TOL ? '#18ff4a' : '#ffba08';
+  ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(-r*0.8,0); ctx.lineTo(r*0.8,0); ctx.stroke();
+  ctx.restore();
+
+  // yaw compass ring
+  const t=targets[idx]; const yawErr=diffAngle(yaw,t.yaw);
+  ctx.save();
+  ctx.translate(cx,cy); ctx.rotate((yaw-90)*Math.PI/180);
+  ctx.strokeStyle = yawErr<=YAW_TOL ? '#18ff4a' : '#ffba08';
+  ctx.lineWidth=6; ctx.beginPath();
+  ctx.arc(0,0,r*1.45,-Math.PI/12,Math.PI/12); ctx.stroke();
+  ctx.restore();
+
+  // pitch bar (right)
+  const barX=w*0.92, barY=h*0.15, barH=h*0.7, barW=6;
+  ctx.strokeStyle='#bbb'; ctx.strokeRect(barX-barW/2,barY,barW,barH);
+  const pitchOK = Math.abs(pitch-t.pitch)<=PITCH_TOL;
+  const yPos = barY + barH * ((-pitch + 90)/180); // hiển thị tương đối
+  ctx.beginPath(); ctx.lineWidth=4; ctx.strokeStyle = pitchOK ? '#18ff4a' : '#ffba08';
+  ctx.moveTo(barX-15, yPos); ctx.lineTo(barX+15, yPos); ctx.stroke();
+
+  // === MASK KHUNG ĐÍCH THEO TARGET PITCH + HỒNG TÂM ===
+  drawFramingMask(t.pitch, V_FOV_DEG);
+  drawCrosshair(cx, cy, r);
+
+  // next arrow
+  if (idx<targets.length-1) drawNextArrow(yaw,targets[idx+1].yaw,cx,cy,r);
+}
+
+function drawCrosshair(cx, cy, r){
+  ctx.lineWidth = 2; ctx.strokeStyle = '#ffffff';
+  // vòng tròn nhỏ
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.25, 0, Math.PI*2); ctx.stroke();
+  // dấu cộng
+  ctx.beginPath();
+  ctx.moveTo(cx - r*0.35, cy); ctx.lineTo(cx + r*0.35, cy);
+  ctx.moveTo(cx, cy - r*0.35); ctx.lineTo(cx, cy + r*0.35);
+  ctx.stroke();
+}
+
+function drawFramingMask(targetPitchDeg, vFovDeg){
+  const w = hud.width, h = hud.height;
+  const cx = w/2, cy = h/2;
+
+  // Quy đổi pitch đích -> offset pixel theo vFOV
+  const pxPerDeg = h / vFovDeg;        // xấp xỉ, tinh chỉnh bằng thanh vFOV
+  const yOffset = - targetPitchDeg * pxPerDeg;  // ngẩng (âm) -> dịch lên
+
+  const winW = w * 0.55;   // kích thước khung đích
+  const winH = h * 0.32;
+  const rx = cx - winW/2;
+  const ry = cy + yOffset - winH/2;
+
+  // lớp phủ tối mờ
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(0,0,w,h);
+
+  // "đục" cửa sổ (destination-out)
+  ctx.globalCompositeOperation = 'destination-out';
+  roundRect(ctx, rx, ry, winW, winH, 14);
+  ctx.fill();
+
+  // viền sáng cho cửa sổ
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#00ffd0';
+  roundRect(ctx, rx, ry, winW, winH, 14);
+  ctx.stroke();
+  ctx.restore();
+
+  // gợi ý
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '600 12px system-ui, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Đưa hồng tâm vào trong khung đích rồi chụp', cx, ry - 10);
+}
+
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+
+function drawNextArrow(currentYaw,nextYaw,cx,cy,radius){
+  const delta = (nextYaw - currentYaw + 540)%360 - 180; // -180..180 (đường ngắn nhất)
+  const a = (delta)*Math.PI/180;
+  const r1 = radius*1.3, r2=radius*1.7;
+  const ax=cx + r1*Math.cos(a - Math.PI/2), ay=cy + r1*Math.sin(a - Math.PI/2);
+  const bx=cx + r2*Math.cos(a - Math.PI/2), by=cy + r2*Math.sin(a - Math.PI/2);
+  ctx.strokeStyle=getArrowColor(delta); ctx.lineWidth=4;
+  ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+  const head=15;
+  ctx.beginPath(); ctx.moveTo(bx,by);
+  ctx.lineTo(bx - head*Math.cos(a - Math.PI/2 - Math.PI/6), by - head*Math.sin(a - Math.PI/2 - Math.PI/6));
+  ctx.lineTo(bx - head*Math.cos(a - Math.PI/2 + Math.PI/6), by - head*Math.sin(a - Math.PI/2 + Math.PI/2 - Math.PI/3));
+  ctx.closePath(); ctx.fillStyle=getArrowColor(delta); ctx.fill();
+}
+function getArrowColor(delta){
+  const ad=Math.abs(delta);
+  if (ad<60) return '#00c8ff';
+  if (ad<120) return '#22a6f2';
+  return '#2e86de';
+}
+
+/* ====================== CAPTURE ====================== */
+function onCapture(){
+  const c=document.createElement('canvas'); c.width=cam.videoWidth; c.height=cam.videoHeight;
+  c.getContext('2d').drawImage(cam,0,0);
+  const dataUrl=c.toDataURL('image/jpeg',0.92);
+  captured.push({ yaw:targets[idx].yaw, pitch:targets[idx].pitch, dataUrl });
+  idx++;
+  if (idx>=targets.length){ shotBtn.disabled=true; stitchBtn.disabled=false; }
+}
+
+/* ====================== STITCH (OpenCV.js) ====================== */
+async function doStitch(){
+  stitchBtn.disabled=true;
+  panoUrl = await stitchSequence(captured);
+  viewBtn.disabled=false; downloadBtn.disabled=false;
+}
+
+// Helpers
+function dataURLToMat(dataUrl,maxW=1800){
+  return new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      const scale=Math.min(1,maxW/img.width);
+      const w=Math.round(img.width*scale), h=Math.round(img.height*scale);
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      const id=c.getContext('2d').getImageData(0,0,w,h);
+      res(cv.matFromImageData(id));
+    };
+    img.src=dataUrl;
+  });
+}
+
+function matToDataURL(mat, q=0.92){
+  const c=document.createElement('canvas'); c.width=mat.cols; c.height=mat.rows;
+  const imgData=new ImageData(new Uint8ClampedArray(mat.data), mat.cols, mat.rows);
+  c.getContext('2d').putImageData(imgData,0,0);
+  return c.toDataURL('image/jpeg', q);
+}
+
+function toGray(m){ const g=new cv.Mat(); cv.cvtColor(m,g,cv.COLOR_RGBA2GRAY); return g; }
+
+function matchAndHomography(A,B){
+  const gA=toGray(A), gB=toGray(B);
+  const orb=new cv.ORB(); const kpA=new cv.KeyPointVector(), kpB=new cv.KeyPointVector();
+  const desA=new cv.Mat(), desB=new cv.Mat();
+  orb.detectAndCompute(gA,new cv.Mat(),kpA,desA);
+  orb.detectAndCompute(gB,new cv.Mat(),kpB,desB);
+  const bf=new cv.BFMatcher(cv.NORM_HAMMING,true); const mv=new cv.DMatchVector();
+  bf.match(desA,desB,mv);
+  const arr=[]; for(let i=0;i<mv.size();i++) arr.push(mv.get(i));
+  arr.sort((a,b)=>a.distance-b.distance);
+  const keep=arr.slice(0,Math.max(15,Math.floor(arr.length*0.5)));
+  const src=[], dst=[];
+  keep.forEach(m=>{ const p1=kpA.get(m.queryIdx).pt, p2=kpB.get(m.trainIdx).pt; src.push(p1.x,p1.y); dst.push(p2.x,p2.y); });
+  const srcM=cv.matFromArray(keep.length,1,cv.CV_32FC2,new Float32Array(src));
+  const dstM=cv.matFromArray(keep.length,1,cv.CV_32FC2,new Float32Array(dst));
+  const H=cv.findHomography(dstM, srcM, cv.RANSAC, 4.0);
+  // cleanup
+  gA.delete(); gB.delete(); orb.delete(); kpA.delete(); kpB.delete(); desA.delete(); desB.delete(); bf.delete(); mv.delete(); srcM.delete(); dstM.delete();
+  return H;
+}
+
+function blendLinear(base,overlay){
+  const gray=new cv.Mat(); cv.cvtColor(overlay,gray,cv.COLOR_RGBA2GRAY);
+  const mask=new cv.Mat(); cv.threshold(gray,mask,1,255,cv.THRESH_BINARY);
+  const feather=new cv.Mat(); cv.GaussianBlur(mask,feather,new cv.Size(21,21),0);
+  const inv=new cv.Mat(); cv.bitwise_not(feather,inv);
+  cv.cvtColor(feather,feather,cv.COLOR_GRAY2RGBA); cv.cvtColor(inv,inv,cv.COLOR_GRAY2RGBA);
+  const roi=base.roi(new cv.Rect(0,0,overlay.cols,overlay.rows));
+  const tmp1=new cv.Mat(), tmp2=new cv.Mat();
+  cv.multiply(overlay,feather,tmp1,1/255); cv.multiply(roi,inv,tmp2,1/255); cv.add(tmp1,tmp2,roi);
+  tmp1.delete(); tmp2.delete(); roi.delete(); inv.delete(); feather.delete(); mask.delete(); gray.delete();
+  return base;
+}
+
+function autoCrop(mat){
+  const gray=new cv.Mat(); cv.cvtColor(mat,gray,cv.COLOR_RGBA2GRAY);
+  const mask=new cv.Mat(); cv.threshold(gray,mask,1,255,cv.THRESH_BINARY);
+  const cnts=new cv.MatVector(), hier=new cv.Mat(); cv.findContours(mask,cnts,hier,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE);
+  let rect=new cv.Rect(0,0,mat.cols,mat.rows);
+  if (cnts.size()>0){
+    let x=1e9, y=1e9, r=0, b=0;
+    for(let i=0;i<cnts.size();i++){ const rr=cv.boundingRect(cnts.get(i)); x=Math.min(x,rr.x); y=Math.min(y,rr.y); r=Math.max(r,rr.x+rr.width); b=Math.max(b,rr.y+rr.height); }
+    rect=new cv.Rect(x,y,Math.max(1,r-x),Math.max(1,b-y));
+  }
+  const out=mat.roi(rect).clone(); gray.delete(); mask.delete(); cnts.delete(); hier.delete(); return out;
+}
+
+async function stitchSequence(datas){
+  const imgs=[];
+  for (const d of datas){ const m=await dataURLToMat(d.dataUrl, 1800); imgs.push({yaw:d.yaw, mat:m}); }
+  imgs.sort((a,b)=>a.yaw-b.yaw);
+
+  let pano=imgs[0].mat.clone();
+  for (let i=1;i<imgs.length;i++){
+    const A=pano, B=imgs[i].mat;
+    const H=matchAndHomography(A,B);
+    const warped=new cv.Mat();
+    const size=new cv.Size(A.cols + Math.round(B.cols*0.9), Math.max(A.rows,B.rows));
+    cv.warpPerspective(B,warped,H,size,cv.INTER_LINEAR,cv.BORDER_TRANSPARENT,new cv.Scalar());
+    const canvas=new cv.Mat.zeros(size.height,size.width,A.type());
+    const roi=canvas.roi(new cv.Rect(0,0,A.cols,A.rows)); A.copyTo(roi); roi.delete();
+    const blended=blendLinear(canvas,warped);
+    pano.delete(); canvas.delete(); warped.delete(); H.delete();
+    pano=blended;
+  }
+  const cropped=autoCrop(pano); pano.delete();
+  const url=matToDataURL(cropped,0.92); cropped.delete();
+  return url;
+}
+
+/* ====================== VIEWER / DOWNLOAD ====================== */
+function initViewer(){
+  if (viewer) viewer.destroy();
+  viewer = new PhotoSphereViewer.Viewer({
+    container: viewerDiv, panorama: panoUrl,
+    defaultYaw: 0, navbar: ['zoom','autorotate','fullscreen'], touchmoveTwoFingers: true
+  });
+  // chạm để thoát viewer
+  viewerDiv.addEventListener('click', ()=>{ viewerDiv.style.display='none'; viewer.destroy(); viewer=null; }, { once:true });
+}
+
+function downloadPano(){
+  const a=document.createElement('a');
+  a.href=panoUrl; a.download='panorama-360.jpg'; a.click();
+}
+</script>
 </body>
 </html>
