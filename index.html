@@ -51,6 +51,8 @@
     #flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
 
     .tiny{font-size:12px;color:#9fb0db}
+    /* 3D overlay */
+    #ar3d{position:absolute;inset:0;pointer-events:none}
   </style>
 </head>
 <body>
@@ -63,6 +65,7 @@
 
     <div class="video-wrap" id="videoWrap">
       <video id="cam" playsinline autoplay muted></video>
+      <div id="ar3d"></div>
       <canvas id="hud"></canvas>
       <div id="flash"></div>
     </div>
@@ -71,6 +74,7 @@
       <div class="row">
         <button class="btn" id="btnStart">Bắt đầu</button>
         <button class="btn" id="btnCalibPitch">Căn ngang (đặt 0°)</button>
+        <button class="btn" id="btn3d">3D Mask: On</button>
         <button class="btn primary" id="btnShot" disabled>Chụp</button>
       </div>
       <div class="row slider">
@@ -126,6 +130,9 @@
   const btnBack = el('btnBack');
   const btnCancel = el('btnCancel');
 
+  const btn3d = el('btn3d');
+  const ar3dContainer = document.getElementById('ar3d');
+
   const fovSlider = el('fov');
   const fovVal = el('fovVal');
 
@@ -152,6 +159,10 @@
   let captured=[]; // {yaw,pitch,dataUrl}
 
   let vFOVdeg = 60; // adjustable
+
+  // 3D overlay state
+  let threeEnabled = true;
+  let three = null; // {renderer, scene, camera, ring, rectGreen, rectWhite, arrow, group, container}
 
   // OpenCV gate
   let cvReady = new Promise(res=>{
@@ -329,7 +340,7 @@
     // Central reticle
     const cx = w/2, cy = h/2 + yOffset;
 
-    // Draw masks
+    // Draw masks (2D)
     ctx.save();
     if(mask.type==='circle-arrow'){
       ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.beginPath();
@@ -374,8 +385,8 @@
     const text = guidanceText(errYaw, errPitch, errRoll);
     hint.textContent = text;
 
-    // Debug tiny (optional)
-    // drawTiny(`yaw:${yaw.toFixed(0)} pitch:${(pitch).toFixed(0)} roll:${roll.toFixed(0)}`, 8, h-10);
+    // Kick 3D overlay update
+    if(threeEnabled && three){ render3DMask(errYaw, errPitch); }
 
     requestAnimationFrame(drawHUD);
   }
@@ -398,6 +409,105 @@
     ctx.beginPath(); ctx.moveTo(-len*0.6, 0); ctx.lineTo(len*0.6, 0); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(len*0.2, -len*0.35); ctx.lineTo(len*0.6, 0); ctx.lineTo(len*0.2, len*0.35); ctx.stroke();
     ctx.restore();
+  }
+
+  // ================== 3D Overlay (Three.js) ==================
+  function initThree(){
+    if(!ar3dContainer) return;
+    const r = new THREE.WebGLRenderer({alpha:true, antialias:true});
+    r.setPixelRatio(window.devicePixelRatio||1);
+    r.setSize(ar3dContainer.clientWidth, ar3dContainer.clientHeight, false);
+    ar3dContainer.innerHTML='';
+    ar3dContainer.appendChild(r.domElement);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(vFOVdeg, ar3dContainer.clientWidth/ar3dContainer.clientHeight, 0.1, 100);
+    scene.add(new THREE.AmbientLight(0xffffff, 1));
+
+    const group = new THREE.Group();
+    scene.add(group);
+
+    // Circle ring for equator
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.25, 0.3, 64),
+      new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.95, side:THREE.DoubleSide})
+    );
+    ring.visible=false; group.add(ring);
+
+    // Rect w/ hole textures
+    function roundRect2D(g, x,y,w,h,r){
+      const rr=Math.min(r,w/2,h/2); g.beginPath(); g.moveTo(x+rr,y);
+      g.arcTo(x+w,y,x+w,y+h,rr); g.arcTo(x+w,y+h,x,y+h,rr); g.arcTo(x,y+h,x,y,rr); g.arcTo(x,y,x+w,y,rr); g.closePath();
+    }
+    function makeRectTex(color){
+      const s=256, c=document.createElement('canvas'); c.width=c.height=s; const g=c.getContext('2d');
+      g.clearRect(0,0,s,s);
+      g.fillStyle=color; g.globalAlpha=0.35; roundRect2D(g, 18, 40, s-36, s-80, 28); g.fill(); g.globalAlpha=1;
+      g.globalCompositeOperation='destination-out'; g.beginPath(); g.arc(s/2, s/2, 58, 0, Math.PI*2); g.fill(); g.globalCompositeOperation='source-over';
+      return new THREE.CanvasTexture(c);
+    }
+    const rectGreenTex = makeRectTex('#10b981');
+    const rectWhiteTex = makeRectTex('#ffffff');
+
+    const planeGeo = new THREE.PlaneGeometry(0.9, 0.7);
+    const rectGreen = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({map:rectGreenTex, transparent:true, side:THREE.DoubleSide}));
+    rectGreen.visible=false; group.add(rectGreen);
+
+    const rectWhite = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({map:rectWhiteTex, transparent:true, side:THREE.DoubleSide}));
+    rectWhite.visible=false; group.add(rectWhite);
+
+    // 3D arrow (left/right indicator)
+    const arrow = new THREE.Group();
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.01,0.3,12), new THREE.MeshBasicMaterial({color:0xffffff}));
+    shaft.position.y=0.15; arrow.add(shaft);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.1,16), new THREE.MeshBasicMaterial({color:0xffffff}));
+    tip.position.y=0.31; arrow.add(tip);
+    arrow.visible=false; group.add(arrow);
+
+    three = {renderer:r, scene, camera, ring, rectGreen, rectWhite, arrow, group, container:ar3dContainer};
+  }
+
+  function resizeThree(){
+    if(!three) return;
+    const w = three.container.clientWidth, h = three.container.clientHeight;
+    three.renderer.setSize(w,h,false);
+    three.camera.aspect = w/h; three.camera.fov=vFOVdeg; three.camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resizeThree);
+
+  function render3DMask(errYaw, errPitch){
+    if(!three || !threeEnabled) return;
+    const t = targets[Math.min(idx, targets.length-1)];
+
+    // Position a mask at a fixed distance along camera forward, offset by delta yaw/pitch
+    const d = 1.5; // meters (relative)
+    const ox = Math.tan(toRad(errYaw)) * d;
+    const oy = Math.tan(toRad(-errPitch)) * d;
+    const oz = -d;
+
+    // Hide all first
+    three.ring.visible=false; three.rectGreen.visible=false; three.rectWhite.visible=false; three.arrow.visible=false;
+
+    if(t.pitch===0){
+      three.ring.visible=true;
+      three.ring.position.set(ox, oy, oz);
+      three.ring.lookAt(three.camera.position);
+      // Arrow side
+      const side = ((((nextYawForStep(idx) - yaw + 540)%360)-180) >= 0) ? 1 : -1;
+      three.arrow.visible=true;
+      three.arrow.position.set(ox + side*0.6, oy, oz);
+      three.arrow.lookAt(ox, oy, oz);
+    } else if(t.pitch<0){
+      three.rectGreen.visible=true;
+      three.rectGreen.position.set(ox, oy, oz);
+      three.rectGreen.lookAt(three.camera.position);
+    } else {
+      three.rectWhite.visible=true;
+      three.rectWhite.position.set(ox, oy, oz);
+      three.rectWhite.lookAt(three.camera.position);
+    }
+
+    three.renderer.render(three.scene, three.camera);
   }
 
   // ================== Capture & Sequence ==================
@@ -541,6 +651,8 @@
     started=true; compassCalibrated=false; idx=0; captured.length=0; renderProgress();
     hint.textContent='Đang mở camera & căn hướng Nam... giữ máy ổn định';
     await startCamera();
+    resizeHUD();
+    if(threeEnabled){ initThree(); resizeThree(); }
     drawHUD();
   }
 
@@ -549,6 +661,7 @@
     stopCamera();
     hint.textContent='Bấm Bắt đầu để cấp quyền cảm biến & camera';
     btnStitch.disabled=true; btnShot.disabled=true;
+    if(three){ three.renderer.dispose(); ar3dContainer.innerHTML=''; three=null; }
   }
 
   // ================== Events ==================
@@ -567,13 +680,24 @@
   btnBack.addEventListener('click', resetAll);
   btnCancel.addEventListener('click', resetAll);
 
-  fovSlider.addEventListener('input', e=>{ vFOVdeg = +e.target.value; fovVal.textContent=vFOVdeg; });
+  fovSlider.addEventListener('input', e=>{ vFOVdeg = +e.target.value; fovVal.textContent=vFOVdeg; resizeHUD(); resizeThree(); });
+
 
   // Update shot button enablement tied to HUD loop
   setInterval(()=>{ if(started) updateShotButton(); }, 80);
 
   // Viewer controls
   btnCloseViewer.addEventListener('click', ()=>{ viewerWrap.style.display='none'; });
+
+  // 3D toggle
+  btn3d.addEventListener('click', ()=>{
+    threeEnabled = !threeEnabled;
+    btn3d.textContent = '3D Mask: ' + (threeEnabled ? 'On' : 'Off');
+    ar3dContainer.style.display = threeEnabled ? 'block' : 'none';
+    if(threeEnabled && !three){ initThree(); resizeThree(); }
+  });
+
+  // Initialize('click', ()=>{ viewerWrap.style.display='none'; });
 
   // Initialize
   renderProgress();
