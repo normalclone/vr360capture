@@ -27,7 +27,7 @@
 
     .video-wrap{position:relative;flex:1;overflow:hidden}
     video#cam{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}  /* mirror for stable aiming UX */
-    canvas#hud{position:absolute;inset:0;pointer-events:none}
+    canvas#hud{position:absolute;inset:0;pointer-events:none;width:100%;height:100%} 
 
     .bottom{position:fixed;bottom:0;left:0;right:0;display:flex;flex-direction:column;gap:8px;padding:10px;background:linear-gradient(0deg, rgba(0,0,0,.75), rgba(0,0,0,.25) 60%, transparent);z-index:20}
     .row{display:flex;gap:8px;align-items:center;justify-content:space-between}
@@ -311,7 +311,7 @@
     if(!hud.width) return;
     ctx.clearRect(0,0,hud.width,hud.height);
 
-    const w=hud.clientWidth, h=hud.clientHeight;
+    const dpr = window.devicePixelRatio || 1; const w = hud.width / dpr, h = hud.height / dpr;
 
     // Target + errors
     const t = targets[Math.min(idx, targets.length-1)];
